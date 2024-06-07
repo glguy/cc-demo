@@ -1,9 +1,11 @@
 {-# Language MagicHash, UnboxedTuples, BlockArguments, TupleSections #-}
 module Coroutine (
     Coroutine,
-    new,
+    create,
     yield,
     resume,
+    close,
+    wrap,
 
     isDead,
     isSuspended,
@@ -54,11 +56,10 @@ isRunning (Coroutine _ r) =
             _ -> False
 
 -- | Start a new coroutine given a body function.
-new :: (Coroutine i o -> i -> IO o) -> IO (Coroutine i o)
-new k =
+create :: (Coroutine i o -> i -> IO o) -> IO (Coroutine i o)
+create k =
  do r <- newIORef undefined -- placeholder
-    IO \s0# ->
-        case newPromptTag# s0# of
+    IO \s0# -> case newPromptTag# s0# of
             (# s1# , p# #) ->
                 case Coroutine p# r of
                     c ->
@@ -87,3 +88,12 @@ resume (Coroutine p# r) i =
         Suspended k# ->
          do writeIORef r Running
             IO (prompt# p# (k# (# , i #)))
+
+-- | Set a coroutine to be dead
+close :: Coroutine i o -> IO ()
+close (Coroutine _ r) = writeIORef r Dead
+
+-- | Wrap up a coroutine with the resume function so that each
+-- application of the function resume the coroutine body.
+wrap :: (Coroutine i o -> i -> IO o) -> IO (i -> IO o)
+wrap k = resume <$> create k

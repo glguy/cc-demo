@@ -8,7 +8,7 @@ import Data.Foldable ( for_ )
 main :: IO ()
 main =
  do generator <-
-        Coroutine.new \c _ ->
+        Coroutine.create \c _ ->
          do for_ [0..9::Int] \i ->
                 Coroutine.yield c (Just i)
             pure Nothing
@@ -30,7 +30,7 @@ printAll generator =
             printAll generator
 
 summer :: IO (Coroutine Integer ())
-summer = Coroutine.new (loop 0)
+summer = Coroutine.create (loop 0)
     where
         loop acc c i =
          do let i' = acc + i
