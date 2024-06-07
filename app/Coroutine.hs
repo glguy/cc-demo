@@ -4,6 +4,8 @@ module Coroutine (
     new,
     yield,
     resume,
+
+    isDead,
 ) where
 
 import GHC.Prim ( PromptTag#, newPromptTag#, prompt#, control0# )
@@ -17,13 +19,24 @@ data Status i o
     | Suspended (i -> IO o)
     | Dead
 
+isDead :: Coroutine i o -> IO Bool
+isDead (Coroutine _ r) =
+ do status <- readIORef r
+    pure $!
+        case status of
+            Dead -> True
+            _ -> False
+
 new :: (Coroutine i o -> i -> IO o) -> IO (Coroutine i o)
 new k =
  do r <- newIORef Dead -- placeholder
     IO \s0# ->
         case newPromptTag# s0# of
-            (# s1# , p# #) -> unIO
-                (Coroutine p# r <$ writeIORef r (Suspended (\i -> IO (prompt# p# (case k (Coroutine p# r) i <* writeIORef r Dead of IO z# -> z#))))) s1#
+            (# s1# , p# #) ->
+                case Coroutine p# r of
+                    c ->
+                        unIO
+                        (c <$ writeIORef r (Suspended (\i -> IO (prompt# p# (unIO (k c i <* writeIORef r Dead)))))) s1#
 
 yield :: Coroutine i o -> o -> IO i
 yield (Coroutine p# r) o = IO $

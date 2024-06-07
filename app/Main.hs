@@ -22,3 +22,4 @@ printAll generator =
         Just i ->
          do print i
             printAll generator
+
